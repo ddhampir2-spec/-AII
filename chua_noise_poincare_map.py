@@ -1,41 +1,39 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from chua_generator import ChuaGenerator
 
 # ==========================================================
 # PARAMETERS
 # ==========================================================
-alpha = 9.0
-beta  = 14.285714
-
-m0 = -8/7
-m1 = -5/7
-
-dt = 0.01
-T  = 1000
-N  = int(T/dt)
 
 sigma = 0.1
 num_runs = 5
 
-# ==========================================================
-# CHUA NONLINEARITY
-# ==========================================================
-def h(x):
+transient_time = 200
 
-    return (
-        m1*x
-        + 0.5*(m0-m1)*(abs(x+1)-abs(x-1))
-    )
-# ==========================================================
-# STATE EQUATIONS
-# ==========================================================
-def f(x, y, z):
+chua = ChuaGenerator(
+    alpha=9.0,
+    beta=14.285714,
+    m0=-8/7,
+    m1=-5/7,
+    dt=0.01,
+    T=1000
+)
 
-    dx = alpha * (y - x - h(x))
-    dy = x - y + z
-    dz = -beta * y
+alpha = chua.alpha
+beta  = chua.beta
 
-    return dx, dy, dz
+m0 = chua.m0
+m1 = chua.m1
+
+dt = chua.dt
+T  = chua.T
+N  = chua.N
+
+sigma = 0.1
+num_runs = 5
+
+
 
 # ==========================================================
 # EQUILIBRIUM
@@ -95,119 +93,23 @@ eqm_p1 = []
 eqm_p2 = []
 
 # ==========================================================
-# SIMULATION (RK4 + Gaussian Noise)
-# ==========================================================
-def simulate_chua(seed):
-
-    np.random.seed(seed)
-
-    x = np.zeros(N)
-    y = np.zeros(N)
-    z = np.zeros(N)
-
-    x[0] = 0.1
-    y[0] = 0.0
-    z[0] = 0.0
-
-    sqrt_dt = np.sqrt(dt)
-
-    for n in range(N-1):
-
-        # ----------------------------
-        # RK4 Stage 1
-        # ----------------------------
-        k1x, k1y, k1z = f(
-            x[n],
-            y[n],
-            z[n]
-        )
-
-        # ----------------------------
-        # RK4 Stage 2
-        # ----------------------------
-        k2x, k2y, k2z = f(
-            x[n] + 0.5*dt*k1x,
-            y[n] + 0.5*dt*k1y,
-            z[n] + 0.5*dt*k1z
-        )
-
-        # ----------------------------
-        # RK4 Stage 3
-        # ----------------------------
-        k3x, k3y, k3z = f(
-            x[n] + 0.5*dt*k2x,
-            y[n] + 0.5*dt*k2y,
-            z[n] + 0.5*dt*k2z
-        )
-
-        # ----------------------------
-        # RK4 Stage 4
-        # ----------------------------
-        k4x, k4y, k4z = f(
-            x[n] + dt*k3x,
-            y[n] + dt*k3y,
-            z[n] + dt*k3z
-        )
-
-        # ----------------------------
-        # Gaussian noise
-        # ----------------------------
-        noise = sigma * np.random.randn() * sqrt_dt
-
-        # ----------------------------
-        # RK4 Update
-        # ----------------------------
-        x[n+1] = (
-            x[n]
-            + dt/6.0 * (
-                k1x +
-                2*k2x +
-                2*k3x +
-                k4x
-            )
-        )
-
-        y[n+1] = (
-            y[n]
-            + dt/6.0 * (
-                k1y +
-                2*k2y +
-                2*k3y +
-                k4y
-            )
-        )
-
-        z[n+1] = (
-            z[n]
-            + dt/6.0 * (
-                k1z +
-                2*k2z +
-                2*k3z +
-                k4z
-            )
-            + noise
-        )
-
-    return x, y, z
-
-# ==========================================================
 # MULTIPLE RUNS
 # ==========================================================
 for run in range(num_runs):
 
     print(f"Run {run+1}/{num_runs}")
 
-    x, y, z = simulate_chua(seed=run)
+    x, y, z = chua.simulate(
+    sigma=sigma,
+    seed=run
+)
 
-    # ------------------------------------------------------
-    # REMOVE TRANSIENT
-    # ------------------------------------------------------
-    cut = int(0.2*N)
-
-    x = x[cut:]
-    y = y[cut:]
-    z = z[cut:]
-
+    x, y, z, cut = chua.remove_transient(
+        x,
+        y,
+        z,
+        transient_time
+    )
     # ======================================================
     # LOOP
     # ======================================================
