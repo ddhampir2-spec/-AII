@@ -1,0 +1,17 @@
+Version 4
+SymbolType BLOCK
+LINE Normal 48 -26 48 -32
+LINE Normal 32 -16 48 -26
+LINE Normal 64 -8 32 -16
+LINE Normal 32 0 64 -8
+LINE Normal 48 5 32 0
+LINE Normal 48 16 48 5
+LINE Normal 48 -64 48 -32
+LINE Normal 48 48 48 16
+RECTANGLE Normal 64 16 32 -32
+PIN 48 -64 BOTTOM 8
+PINATTR PinName VDDC
+PINATTR SpiceOrder 1
+PIN 48 48 TOP 8
+PINATTR PinName VSSC
+PINATTR SpiceOrder 2
