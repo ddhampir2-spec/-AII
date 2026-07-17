@@ -14,12 +14,15 @@ from chua_generator import (
 # PARAMETERS
 # ==========================================================
 
-SPREADING_FACTOR = 100
+SPREADING_FACTOR = 64
 
 NUMBER_OF_BITS = 20
 
-SIGMA = 0
+# ==========================================================
+# CHANNEL PARAMETERS
+# ==========================================================
 
+SNR_dB = 5       # có thể thay: 20,15,10,5,0,-5,...
 SEED = 1
 
 # ==========================================================
@@ -29,7 +32,7 @@ SEED = 1
 chua = ChuaGenerator()
 
 x, y, z = chua.simulate(
-    sigma=SIGMA,
+    sigma=0.2,
     seed=SEED
 )
 
@@ -118,7 +121,7 @@ def dcsk_encode(
     )
 
 # ==========================================================
-# Encoding
+# Transmitter
 # ==========================================================
 
 reference, information, tx = dcsk_encode(
@@ -129,6 +132,30 @@ reference, information, tx = dcsk_encode(
 
 )
 
+# ======================================================
+# Compute Signal Power
+# ======================================================
+
+signal_power = np.mean(tx**2)
+
+# ======================================================
+# Convert SNR(dB) -> Noise Power
+# ======================================================
+
+snr_linear = 10**(SNR_dB/10)
+
+noise_power = signal_power / snr_linear
+
+sigma = np.sqrt(noise_power)
+
+print("--------------------------------")
+print("Channel")
+print("--------------------------------")
+print(f"SNR(dB)      = {SNR_dB}")
+print(f"Signal Power = {signal_power:.4f}")
+print(f"Noise Power  = {noise_power:.4f}")
+print(f"Noise Sigma  = {sigma:.4f}")
+
 print("--------------------------------")
 print("Encoding Finished")
 print("--------------------------------")
@@ -136,6 +163,96 @@ print("--------------------------------")
 print("Spreading Factor =", SPREADING_FACTOR)
 
 print("Total Samples =", len(tx))
+
+# ======================================================
+# DCSK Decoder
+# ======================================================
+
+def dcsk_decode(rx, B):
+    symbol_length = 2 * B
+
+    num_symbols = len(rx) // symbol_length
+
+    decoded_bits = np.zeros(num_symbols, dtype=int)
+
+    metric = np.zeros(num_symbols)
+
+    for k in range(num_symbols):
+
+        start = k * symbol_length
+
+        # ----------------------------
+        # Reference slot
+        # ----------------------------
+        reference = rx[start:start+B]
+
+        # ----------------------------
+        # Data slot
+        # ----------------------------
+        information = rx[start+B:start+2*B]
+
+        # ----------------------------
+        # Correlator
+        #
+        # D = Σ reference(i)*information(i)
+        # ----------------------------
+        D = np.sum(reference * information)
+
+        metric[k] = D
+
+        # ----------------------------
+        # Decision
+        # ----------------------------
+        if D >= 0:
+
+            decoded_bits[k] = 1
+
+        else:
+
+            decoded_bits[k] = 0
+
+    return decoded_bits, metric
+
+# ======================================================
+# CHANNEL (AWGN)
+# ======================================================
+
+noise = sigma * np.random.randn(len(tx))
+
+rx = tx + noise
+
+# ======================================================
+# RECEIVER
+# ======================================================
+
+decoded_bits, metric = dcsk_decode(
+
+    rx,
+
+    SPREADING_FACTOR
+
+)
+
+print("-----------------------")
+print("TX Bits")
+print("-----------------------")
+
+print(bits)
+
+print("-----------------------")
+print("RX Bits")
+print("-----------------------")
+
+print(decoded_bits)
+
+BER = np.mean(
+    bits != decoded_bits
+)
+
+print()
+
+print(f"SNR = {SNR_dB} dB")
+print(f"BER = {BER:.6f}")
 
 # ==========================================================
 # NUMBER OF SAMPLES TO DISPLAY
@@ -197,8 +314,12 @@ ax[0,0].grid(True)
 # ==========================================================
 
 ax[0,1].plot(
-    tx[:dcsk_samples],
+    rx[:dcsk_samples],
     linewidth=1
+)
+
+ax[0,1].set_title(
+    "Received DCSK Signal (AWGN)"
 )
 
 for k in range(NUMBER_OF_BITS):
@@ -230,80 +351,94 @@ for k in range(NUMBER_OF_BITS):
         alpha=0.5
     )
 
-ax[0,1].set_title("DCSK Encoded Signal")
+ax[0,1].set_title(
+    f"Received DCSK Signal (SNR = {SNR_dB} dB)"
+)
 ax[0,1].set_xlabel("Sample")
 ax[0,1].set_ylabel("Amplitude")
 ax[0,1].grid(True)
 
 # ==========================================================
-# 3. FIRST SYMBOL
+# 3. DECISION VARIABLE (Correlation)
 # ==========================================================
 
-ax[1,0].plot(
-    tx[:2*SPREADING_FACTOR],
-    linewidth=2
+bit_index = np.arange(NUMBER_OF_BITS)
+
+ax[1,0].stem(
+    bit_index,
+    metric,
+    basefmt=" "
 )
 
-ax[1,0].axvline(
-    SPREADING_FACTOR,
+ax[1,0].axhline(
+    0,
     color='red',
+    linestyle='--'
+)
+
+ax[1,0].set_title("Decision Variable (Correlation)")
+
+ax[1,0].set_xlabel("Bit Index")
+
+ax[1,0].set_ylabel("Correlation")
+
+ax[1,0].grid(True)
+
+# ==========================================================
+# 4. TX / RX BIT COMPARISON
+# ==========================================================
+
+bit_index = np.arange(NUMBER_OF_BITS)
+
+ax[1,1].step(
+    bit_index,
+    bits,
+    where='mid',
+    linewidth=2,
+    label="TX Bits"
+)
+
+ax[1,1].step(
+    bit_index,
+    decoded_bits,
+    where='mid',
     linestyle='--',
     linewidth=2,
-    label='Reference / Data'
+    label="Decoded Bits"
 )
 
-ax[1,0].text(
-    SPREADING_FACTOR/2,
-    1.05,
-    "Reference",
-    ha='center',
-    color='blue',
-    fontsize=11
-)
+# Đánh dấu các bit lỗi (nếu có)
 
-ax[1,0].text(
-    SPREADING_FACTOR*1.5,
-    1.05,
-    "Data",
-    ha='center',
-    color='green',
-    fontsize=11
-)
+error = np.where(bits != decoded_bits)[0]
 
-ax[1,0].set_title(
-    f"First DCSK Symbol (Bit = {bits[0]})"
-)
+if len(error) > 0:
 
-ax[1,0].set_xlabel("Sample")
-ax[1,0].set_ylabel("Amplitude")
-ax[1,0].grid(True)
-ax[1,0].legend()
+    ax[1,1].scatter(
+        error,
+        bits[error],
+        color='red',
+        s=80,
+        label='Bit Error',
+        zorder=5
+    )
 
-# ==========================================================
-# 4. REFERENCE vs INFORMATION
-# ==========================================================
+ax[1,1].set_ylim(-0.5,1.5)
 
-ax[1,1].plot(
-    reference[:SPREADING_FACTOR],
-    linewidth=2,
-    label="Reference"
-)
+ax[1,1].set_xticks(bit_index)
 
-ax[1,1].plot(
-    information[:SPREADING_FACTOR],
-    '--',
-    linewidth=2,
-    label="Information"
-)
+ax[1,1].set_yticks([0,1])
 
-ax[1,1].set_title(
-    f"Reference vs Information (Bit = {bits[0]})"
-)
+ax[1,1].set_xlabel("Bit Index")
 
-ax[1,1].set_xlabel("Sample")
-ax[1,1].set_ylabel("Amplitude")
+ax[1,1].set_ylabel("Bit Value")
+
+ax[1,1].set_title("Transmitted vs Decoded Bits")
+
 ax[1,1].grid(True)
+
 ax[1,1].legend()
+
+
 
 # ==========================================================
 # SHOW
@@ -311,3 +446,4 @@ ax[1,1].legend()
 
 plt.tight_layout()
 plt.show()
+
