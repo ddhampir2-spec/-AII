@@ -6,8 +6,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from chua_generator import ChuaGenerator
-from chua_generator import remove_transient
+from chua_generator import (
+    ChuaGenerator,
+)
 
 # ==========================================================
 # PARAMETERS
@@ -34,18 +35,18 @@ x, y, z = chua.simulate(
 
 # Remove transient
 
-chaos, cut = remove_transient(
-    x,
-    window=1000,
-    tolerance=0.01,
-    consecutive=10
-)
+x, y, z, cut = chua.remove_transient(
+        x,
+        y,
+        z,
+        transient_time=100     # có thể thay đổi
+    )
 
 print("Transient removed at sample =", cut)
 
 # Normalize
 
-chaos = chua.normalize(chaos)
+chaos = chua.normalize(x)
 
 # ==========================================================
 # Generate Random Bits
@@ -137,90 +138,176 @@ print("Spreading Factor =", SPREADING_FACTOR)
 print("Total Samples =", len(tx))
 
 # ==========================================================
-# Plot Chaotic Signal
+# NUMBER OF SAMPLES TO DISPLAY
 # ==========================================================
 
-plt.figure(figsize=(12,4))
+display_samples = NUMBER_OF_BITS * 2 * SPREADING_FACTOR
 
-plt.plot(
-    chaos[:1000]
+chaos_display = chaos[:display_samples]
+
+# ==========================================================
+# CREATE FIGURE
+# ==========================================================
+
+chaos_samples = NUMBER_OF_BITS * SPREADING_FACTOR
+dcsk_samples  = NUMBER_OF_BITS * 2 * SPREADING_FACTOR
+
+fig, ax = plt.subplots(
+    2,
+    2,
+    figsize=(18,10)
 )
 
-plt.title("Chaotic Signal")
-
-plt.xlabel("Sample")
-
-plt.ylabel("Amplitude")
-
-plt.grid(True)
-
 # ==========================================================
-# Plot DCSK Signal
+# 1. ORIGINAL CHAOTIC SIGNAL
 # ==========================================================
 
-plt.figure(figsize=(12,4))
+ax[0,0].plot(
+    chaos[:chaos_samples],
+    linewidth=1
+)
 
-plt.plot(tx)
+for k in range(NUMBER_OF_BITS):
 
-plt.title("DCSK Signal")
+    center = k*SPREADING_FACTOR + SPREADING_FACTOR/2
 
-plt.xlabel("Sample")
+    ax[0,0].text(
+        center,
+        1.08,
+        str(bits[k]),
+        color='red',
+        ha='center',
+        fontsize=11,
+        fontweight='bold'
+    )
 
-plt.ylabel("Amplitude")
+    ax[0,0].axvline(
+        k*SPREADING_FACTOR,
+        color='gray',
+        alpha=0.4
+    )
 
-plt.grid(True)
+ax[0,0].set_title("Original Chaotic Signal")
+ax[0,0].set_xlabel("Sample")
+ax[0,0].set_ylabel("Amplitude")
+ax[0,0].grid(True)
 
 # ==========================================================
-# Plot First Symbol
+# 2. DCSK SIGNAL
 # ==========================================================
 
-plt.figure(figsize=(12,4))
+ax[0,1].plot(
+    tx[:dcsk_samples],
+    linewidth=1
+)
 
-plt.plot(
+for k in range(NUMBER_OF_BITS):
+
+    center = k*2*SPREADING_FACTOR + SPREADING_FACTOR
+
+    ax[0,1].text(
+        center,
+        1.08,
+        str(bits[k]),
+        color='red',
+        ha='center',
+        fontsize=11,
+        fontweight='bold'
+    )
+
+    # bắt đầu symbol
+    ax[0,1].axvline(
+        k*2*SPREADING_FACTOR,
+        color='gray',
+        alpha=0.4
+    )
+
+    # ranh giới Reference/Data
+    ax[0,1].axvline(
+        k*2*SPREADING_FACTOR + SPREADING_FACTOR,
+        color='gray',
+        linestyle='--',
+        alpha=0.5
+    )
+
+ax[0,1].set_title("DCSK Encoded Signal")
+ax[0,1].set_xlabel("Sample")
+ax[0,1].set_ylabel("Amplitude")
+ax[0,1].grid(True)
+
+# ==========================================================
+# 3. FIRST SYMBOL
+# ==========================================================
+
+ax[1,0].plot(
     tx[:2*SPREADING_FACTOR],
     linewidth=2
 )
 
-plt.axvline(
+ax[1,0].axvline(
     SPREADING_FACTOR,
     color='red',
-    linestyle='--'
+    linestyle='--',
+    linewidth=2,
+    label='Reference / Data'
 )
 
-plt.title("First DCSK Symbol")
+ax[1,0].text(
+    SPREADING_FACTOR/2,
+    1.05,
+    "Reference",
+    ha='center',
+    color='blue',
+    fontsize=11
+)
 
-plt.xlabel("Sample")
+ax[1,0].text(
+    SPREADING_FACTOR*1.5,
+    1.05,
+    "Data",
+    ha='center',
+    color='green',
+    fontsize=11
+)
 
-plt.ylabel("Amplitude")
+ax[1,0].set_title(
+    f"First DCSK Symbol (Bit = {bits[0]})"
+)
 
-plt.grid(True)
+ax[1,0].set_xlabel("Sample")
+ax[1,0].set_ylabel("Amplitude")
+ax[1,0].grid(True)
+ax[1,0].legend()
 
 # ==========================================================
-# Plot Reference and Data
+# 4. REFERENCE vs INFORMATION
 # ==========================================================
 
-plt.figure(figsize=(12,4))
-
-plt.subplot(211)
-
-plt.plot(
-    reference[:SPREADING_FACTOR]
+ax[1,1].plot(
+    reference[:SPREADING_FACTOR],
+    linewidth=2,
+    label="Reference"
 )
 
-plt.title("Reference")
-
-plt.grid(True)
-
-plt.subplot(212)
-
-plt.plot(
-    information[:SPREADING_FACTOR]
+ax[1,1].plot(
+    information[:SPREADING_FACTOR],
+    '--',
+    linewidth=2,
+    label="Information"
 )
 
-plt.title("Information")
+ax[1,1].set_title(
+    f"Reference vs Information (Bit = {bits[0]})"
+)
 
-plt.grid(True)
+ax[1,1].set_xlabel("Sample")
+ax[1,1].set_ylabel("Amplitude")
+ax[1,1].grid(True)
+ax[1,1].legend()
+
+# ==========================================================
+# SHOW
+# ==========================================================
 
 plt.tight_layout()
-
 plt.show()
