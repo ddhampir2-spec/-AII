@@ -59,7 +59,7 @@ class ChuaGenerator:
     # ======================================================
 
     def simulate(self,
-                 sigma=0,
+                 sigma,
                  x0=0.1,
                  y0=0,
                  z0=0,
